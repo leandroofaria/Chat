@@ -1,19 +1,34 @@
 import socket as sock
+import threading
 
-HOST = '127.0.0.1' #IP DO SERVIDOR
-PORTA = 9999 #PORTA DO SERVIDOR
+def receber_mensagens(socket_cliente):
+    """Recebe mensagens do servidor e exibe no terminal."""
+    while True:
+        try:
+            mensagem = socket_cliente.recv(1024).decode()
+            print(mensagem)
+        except:
+            print("Conexão encerrada pelo servidor.")
+            socket_cliente.close()
+            break
 
-#criamos o socket do cliente
+HOST = '26.253.198.232'  # IP do servidor
+PORTA = 9999
+
+# Criamos o socket do cliente
 socket_cliente = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
 
-#Solicita conexão ao servidor (HOST,PORTA)
-socket_cliente.connect((HOST,PORTA))
-#Criamos um loop para envio de dados
-print(5*"*" + "INICIANDO CHAT" + 5*"*")
+# Conecta ao servidor
+socket_cliente.connect((HOST, PORTA))
+print(5 * "*" + " INICIANDO CHAT " + 5 * "*")
 nome = input("Informe seu nome para entrar no chat:\n")
-#Antes de entrar no loop enviamos o nome
 socket_cliente.sendall(nome.encode())
+
+# Thread para receber mensagens do servidor
+thread = threading.Thread(target=receber_mensagens, args=(socket_cliente,))
+thread.start()
+
+# Loop para envio de mensagens
 while True:
     mensagem = input('')
-    #encode: faz a conversão str->bytes
     socket_cliente.sendall(mensagem.encode())
