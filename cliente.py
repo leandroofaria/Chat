@@ -31,4 +31,9 @@ thread.start()
 # Loop para envio de mensagens
 while True:
     mensagem = input('')
+    if mensagem.lower() == "/sair":
+        socket_cliente.sendall(mensagem.encode())  # Envia o comando para o servidor
+        print("Você saiu do chat.")
+        socket_cliente.close()
+        break
     socket_cliente.sendall(mensagem.encode())

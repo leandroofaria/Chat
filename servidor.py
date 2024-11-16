@@ -14,19 +14,6 @@ def broadcast(mensagem, remetente=None):
                 cliente.close()
                 remover_cliente(cliente)
 
-def unicast(mensagem, destinatario, remetente_nome):
-    """Envia mensagem para um único cliente."""
-    for cliente, nome in clientes:
-        if nome == destinatario:
-            try:
-                cliente.sendall(f"{remetente_nome} (privado): {mensagem}".encode())
-                return True
-            except:
-                cliente.close()
-                remover_cliente(cliente)
-                return False
-    return False
-
 def remover_cliente(cliente_socket):
     """Remove um cliente desconectado da lista."""
     for cliente, nome in clientes:
@@ -57,6 +44,12 @@ def receber_dados(sock_conn, endereco):
         while True:
             mensagem = sock_conn.recv(1024).decode()
             print(f"{nome} >> {mensagem}")
+
+            if mensagem.lower() == "/sair":
+                # Cliente quer sair do chat
+                remover_cliente(sock_conn)
+                sock_conn.close()
+                break
 
             if mensagem.startswith("@"):
                 # Mensagem privada
