@@ -10,9 +10,24 @@ def broadcast(mensagem, remetente=None):
         if cliente != remetente:
             try:
                 cliente.sendall(mensagem.encode())
-            except:
+            except Exception as e:
+                print(f"Erro ao enviar mensagem para {cliente}: {e}")
                 cliente.close()
                 remover_cliente(cliente)
+
+def unicast(mensagem, destinatario, remetente_nome):
+    """Envia mensagem para um único cliente."""
+    for cliente, nome in clientes:
+        if nome == destinatario:  # Verifica se o nome do destinatário está na lista
+            try:
+                cliente.sendall(f"{remetente_nome} (privado): {mensagem}".encode())
+                return True
+            except Exception as e:
+                print(f"Erro ao enviar mensagem privada para {destinatario}: {e}")
+                cliente.close()
+                remover_cliente(cliente)
+                return False
+    return False  # Retorna falso se o destinatário não for encontrado
 
 def remover_cliente(cliente_socket):
     """Remove um cliente desconectado da lista."""
@@ -28,8 +43,8 @@ def receber_dados(sock_conn, endereco):
         # Loop para validar o nome do cliente
         while True:
             nome = sock_conn.recv(50).decode().strip()
-            if " " in nome:
-                sock_conn.sendall("Erro: O nome não pode conter espaços. Use '_' ou tudo junto.".encode())
+            if " " in nome or not nome.replace("_", "").isalnum():
+                sock_conn.sendall("Erro: O nome só pode conter letras, números e '_'.".encode())
             else:
                 break  # Nome válido, sai do loop
 
@@ -42,43 +57,51 @@ def receber_dados(sock_conn, endereco):
         broadcast(f"{nome} entrou no chat.")
         
         while True:
-            mensagem = sock_conn.recv(1024).decode()
-            print(f"{nome} >> {mensagem}")
+            try:
+                mensagem = sock_conn.recv(1024).decode()
+                if not mensagem:
+                    raise ConnectionError("Conexão perdida com o cliente.")
 
-            if mensagem.lower() == "/sair":
-                # Cliente quer sair do chat
+                print(f"{nome} >> {mensagem}")
+
+                if mensagem.lower() == "/sair":
+                    # Cliente quer sair do chat
+                    remover_cliente(sock_conn)
+                    sock_conn.close()
+                    break
+
+                if mensagem.startswith("@"):
+                    # Mensagem privada
+                    try:
+                        primeiro_espaco = mensagem.find(" ")
+                        if primeiro_espaco == -1:
+                            sock_conn.sendall("Formato inválido. Use: @nome mensagem".encode())
+                            continue
+                        
+                        destinatario = mensagem[1:primeiro_espaco]
+                        conteudo = mensagem[primeiro_espaco + 1:]
+
+                        if not conteudo.strip():
+                            sock_conn.sendall("Erro: Mensagem vazia. Use: @nome mensagem".encode())
+                            continue
+
+                        sucesso = unicast(conteudo, destinatario, nome)
+                        if not sucesso:
+                            sock_conn.sendall("Usuário não encontrado.".encode())
+                    except Exception as e:
+                        print(f"Erro no unicast: {e}")
+                        sock_conn.sendall("Erro ao enviar mensagem privada.".encode())
+                else:
+                    # Mensagem pública
+                    broadcast(f"{nome}: {mensagem}", sock_conn)
+            except Exception as e:
+                print(f"Erro ao processar mensagem de {nome}: {e}")
                 remover_cliente(sock_conn)
                 sock_conn.close()
                 break
-
-            if mensagem.startswith("@"):
-                # Mensagem privada
-                try:
-                    # Identificar destinatário e conteúdo
-                    primeiro_espaco = mensagem.find(" ")
-                    if primeiro_espaco == -1:
-                        sock_conn.sendall("Formato inválido. Use: @nome mensagem".encode())
-                        continue
-                    
-                    destinatario = mensagem[1:primeiro_espaco]
-                    conteudo = mensagem[primeiro_espaco + 1:]
-
-                    if not conteudo.strip():
-                        sock_conn.sendall("Erro: Mensagem vazia. Use: @nome mensagem".encode())
-                        continue
-
-                    sucesso = unicast(conteudo, destinatario, nome)
-                    if not sucesso:
-                        sock_conn.sendall("Usuário não encontrado.".encode())
-                except Exception as e:
-                    print(f"Erro no unicast: {e}")
-                    sock_conn.sendall("Erro ao enviar mensagem privada.".encode())
-            else:
-                # Mensagem pública
-                broadcast(f"{nome}: {mensagem}", sock_conn)
-    except:
+    except Exception as e:
         # Caso ocorra erro ou o cliente desconecte
-        print(f"Erro ou desconexão do cliente: {endereco}")
+        print(f"Erro ou desconexão do cliente {endereco}: {e}")
         remover_cliente(sock_conn)
         sock_conn.close()
 
@@ -86,17 +109,23 @@ HOST = '26.253.198.232'  # IP do servidor
 PORTA = 9999
 
 # Criamos o socket do servidor
-socket_server = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
-# Fazemos o BIND
-socket_server.bind((HOST, PORTA))
-# Entramos no modo escuta (LISTEN)
-socket_server.listen()
-print(f"O servidor {HOST}:{PORTA} está aguardando conexões...")
+try:
+    socket_server = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
+    # Fazemos o BIND
+    socket_server.bind((HOST, PORTA))
+    # Entramos no modo escuta (LISTEN)
+    socket_server.listen()
+    print(f"O servidor {HOST}:{PORTA} está aguardando conexões...")
+except Exception as e:
+    print(f"Erro ao iniciar o servidor: {e}")
+    exit(1)
 
 # Loop principal para recebimento de clientes
 while True:
-    sock_conn, ender = socket_server.accept()
-    # Nesse ponto temos uma conexão com um cliente
-    # Criamos uma thread para lidar com o cliente
-    thread_cliente = threading.Thread(target=receber_dados, args=(sock_conn, ender))
-    thread_cliente.start()
+    try:
+        sock_conn, ender = socket_server.accept()
+        # Thread para lidar com o cliente
+        thread_cliente = threading.Thread(target=receber_dados, args=(sock_conn, ender))
+        thread_cliente.start()
+    except Exception as e:
+        print(f"Erro ao aceitar nova conexão: {e}")

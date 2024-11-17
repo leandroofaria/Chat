@@ -6,9 +6,11 @@ def receber_mensagens(socket_cliente):
     while True:
         try:
             mensagem = socket_cliente.recv(1024).decode()
+            if not mensagem:
+                raise ConnectionError("Conexão encerrada pelo servidor.")
             print(mensagem)
-        except:
-            print("Conexão encerrada pelo servidor.")
+        except (ConnectionError, Exception) as e:
+            print(f"Erro na conexão: {e}")
             socket_cliente.close()
             break
 
@@ -19,8 +21,13 @@ PORTA = 9999
 socket_cliente = sock.socket(sock.AF_INET, sock.SOCK_STREAM)
 
 # Conecta ao servidor
-socket_cliente.connect((HOST, PORTA))
-print(5 * "*" + " INICIANDO CHAT " + 5 * "*")
+try:
+    socket_cliente.connect((HOST, PORTA))
+    print(5 * "*" + " INICIANDO CHAT " + 5 * "*")
+except Exception as e:
+    print(f"Erro ao conectar ao servidor: {e}")
+    exit(1)
+
 nome = input("Informe seu nome para entrar no chat:\n")
 socket_cliente.sendall(nome.encode())
 
@@ -30,10 +37,15 @@ thread.start()
 
 # Loop para envio de mensagens
 while True:
-    mensagem = input('')
-    if mensagem.lower() == "/sair":
-        socket_cliente.sendall(mensagem.encode())  # Envia o comando para o servidor
-        print("Você saiu do chat.")
+    try:
+        mensagem = input('')
+        if mensagem.lower() == "/sair":
+            socket_cliente.sendall(mensagem.encode())  # Envia o comando para o servidor
+            print("Você saiu do chat.")
+            socket_cliente.close()
+            break
+        socket_cliente.sendall(mensagem.encode())
+    except Exception as e:
+        print(f"Erro ao enviar mensagem: {e}")
         socket_cliente.close()
         break
-    socket_cliente.sendall(mensagem.encode())
