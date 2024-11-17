@@ -1,4 +1,4 @@
-# **Projeto Final: Chat em Tempo Real com Sockets**
+# **Projeto Final: Chat em Tempo Real
 
 ---
 
