@@ -43,8 +43,8 @@ def receber_dados(sock_conn, endereco):
         # Loop para validar o nome do cliente
         while True:
             nome = sock_conn.recv(50).decode().strip()
-            if " " in nome or not nome.replace("_", "").isalnum():
-                sock_conn.sendall("Erro: O nome só pode conter letras, números e '_'.".encode())
+            if " " in nome or not nome.replace("_", "").isalpha():
+                sock_conn.sendall("Erro: O nome só pode conter letras e '_', sem números ou espaços.".encode())
             else:
                 break  # Nome válido, sai do loop
 
